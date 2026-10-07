@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carrera al gol</title>
+<style>
+:root{--sea:#1b4468;--ink:#f3efe6;--accent:#ffc247;--h:clamp(64px,12vh,120px);color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:#10243a;color:var(--ink);font-family:"Trebuchet MS",Verdana,sans-serif}
+h1{margin:0;font-size:clamp(1.6rem,5vw,2.3rem);text-shadow:0 2px 8px #0008}
+h2{margin:.3rem 0 0;font-size:1.05rem}
+p{margin:0;opacity:.92}
+button{font:inherit;cursor:pointer;color:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+button:disabled{opacity:.4;cursor:not-allowed}
+ 
+/* ===== ESCENARIO A PANTALLA COMPLETA ===== */
+#stage{position:fixed;inset:0;overflow:hidden;background:#6ec6ff}
+#stage>*{position:absolute}
+#sky{inset:0}
+#sun{top:7vh;right:6vw;font-size:clamp(2.5rem,9vh,5rem);line-height:1}
+.band{left:0;width:100%;overflow:hidden;display:flex}
+.strip{display:flex;width:max-content;animation:mover linear infinite;animation-play-state:paused}
+.half{display:flex}
+.half span{line-height:1}
+@keyframes mover{to{transform:translateX(-50%)}}
+#hills{left:0;width:100%;bottom:34vh;height:26vh;background-repeat:repeat-x;background-size:600px 100%;animation:colinas 16s linear infinite;animation-play-state:paused}
+@keyframes colinas{to{background-position-x:-600px}}
+#ground{left:0;width:100%;bottom:0;height:40vh;box-shadow:inset 0 5px 0 rgba(255,255,255,.55);animation:suelo 2.2s linear infinite;animation-play-state:paused}
+@keyframes suelo{to{background-position-x:-320px}}
+#stage.run .strip,#stage.run #hills,#stage.run #ground{animation-play-state:running}
+#crowd{bottom:39vh;height:14vh;align-items:flex-end}
+.fan{display:inline-block;transform-origin:50% 100%;animation:salto .55s ease-in-out infinite alternate}
+@keyframes salto{from{transform:translateY(0) rotate(-4deg)}to{transform:translateY(-22%) rotate(4deg)}}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+#mute{position:fixed;top:max(8px,env(safe-area-inset-top));right:10px;z-index:20;width:42px;height:42px;border-radius:50%;border:0;background:rgba(8,18,38,.7);font-size:1.25rem;line-height:1}
+#mute:hover{filter:brightness(1.3)}
+ 
+/* ===== PANTALLAS ===== */
+.screen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:max(1rem,env(safe-area-inset-top)) 1rem max(1rem,env(safe-area-inset-bottom))}
+.screen.on{display:flex}
+.panel{background:rgba(8,18,38,.76);backdrop-filter:blur(6px);border-radius:22px;padding:1.4rem;width:min(94vw,640px);max-height:94vh;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:.9rem;text-align:center}
+.btn{width:100%;max-width:340px;font-size:1.15rem;padding:.85rem;border:0;border-radius:12px;background:var(--sea)}
+.btn.main{background:var(--accent);color:#2a1d00}
+.btn:hover:not(:disabled){filter:brightness(1.18)} .btn:active:not(:disabled){transform:scale(.97)}
+.big{font-size:3.5rem;line-height:1.1}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:.6rem;width:100%}
+.opt{background:var(--sea);border:3px solid transparent;border-radius:14px;padding:.5rem .3rem}
+.opt img{height:78px;display:block;margin:0 auto .2rem}
+.opt small{display:block;opacity:.75;font-size:.72rem;margin-top:.1rem}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:#24547f}
+.opts.dif{grid-template-columns:repeat(3,1fr)}
+.opts.dif .opt{padding:.6rem}
+.opts.dif .e{font-size:1.7rem;display:block}
+#nombre{width:100%;max-width:340px;font:inherit;font-size:1.1rem;padding:.7rem;border-radius:10px;border:2px solid #4a7aa8;background:#0d1b30;color:var(--ink);text-align:center}
+.fila{display:flex;gap:.5rem;width:100%}
+.slot{flex:1;display:flex;align-items:center;gap:.8rem;text-align:left;background:var(--sea);border:0;border-radius:14px;padding:.6rem .9rem}
+.slot img{height:56px}
+.slot .vacia{font-size:2rem;width:56px;text-align:center;opacity:.6}
+.slot small{display:block;opacity:.8;margin-top:.15rem}
+.del{border:0;border-radius:14px;background:#5a2a3a;padding:0 1rem;font-size:1.2rem}
+ 
+/* ===== PANTALLA DE CARRERA ===== */
+#game{flex-direction:column;justify-content:space-between;align-items:center;padding-top:calc(max(1rem,env(safe-area-inset-top)) + 44px)}
+.hud{width:min(96vw,1100px);display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;background:rgba(8,18,38,.66);padding:.5rem 1rem;border-radius:14px}
+#abajo{width:min(96vw,1100px);display:flex;flex-direction:column;gap:1.2vh}
+.lane{position:relative;height:var(--h);border-radius:16px}
+.who{position:absolute;left:0;bottom:0;height:100%;transition:left .1s linear;display:flex;align-items:flex-end}
+.who img{height:100%;display:block}
+.who .em{font-size:calc(var(--h)*.78);line-height:1}
+.flag{position:absolute;right:1%;bottom:0;font-size:calc(var(--h)*.8);line-height:1}
+#stage.run~#game .who.corre>*{animation:bob .3s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translateY(-7%)}}
+#count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(4rem,16vh,9rem);font-weight:bold;color:#fff;text-shadow:0 4px 14px #000a;pointer-events:none}
+.push{width:100%;font-size:1.6rem;height:clamp(64px,10vh,96px);border:0;border-radius:18px;background:var(--accent);color:#2a1d00;touch-action:manipulation}
+.push:active{transform:scale(.98)}
+@media (prefers-reduced-motion:reduce){.strip,#hills,#ground,.fan,.who>*{animation:none!important}}
+</style>
+</head>
+<body>
+ 
+<!-- ESCENARIO (siempre ocupa toda la pantalla) -->
+<div id="stage">
+  <div id="sky"></div><div id="sun"></div>
+  <div class="band" id="bClouds"></div>
+  <div id="hills"></div>
+  <div class="band" id="bNear"></div>
+  <div class="band" id="crowd"></div>
+  <div id="ground"></div>
+</div>
+ 
+<!-- MENÚ -->
+<section class="screen on" id="menu"><div class="panel">
+  <h1>⚽ Carrera al gol</h1>
+  <p id="info"></p>
+  <button class="btn main" id="bNueva">Nueva partida</button>
+  <button class="btn" id="bCargar" hidden>Cargar partida</button>
+  <button class="btn" id="bSalir">Salir del juego</button>
+</div></section>
+ 
+<!-- RANURAS DE GUARDADO -->
+<section class="screen" id="slots"><div class="panel">
+  <h1 id="slotsTitulo"></h1>
+  <p id="slotsTexto"></p>
+  <div id="slotLista" style="width:100%;display:flex;flex-direction:column;gap:.6rem"></div>
+  <button class="btn" id="bSlotsVolver">Volver</button>
+</div></section>
+ 
+<!-- NOMBRE, PERSONAJE Y DIFICULTAD -->
+<section class="screen" id="setup"><div class="panel">
+  <h1>Prepara tu partida</h1>
+  <h2>Nombre de la partida</h2>
+  <input id="nombre" maxlength="16" autocomplete="off">
+  <h2>Personaje</h2><div class="opts" id="chars"></div>
+  <h2>Dificultad</h2><div class="opts dif" id="difs"></div>
+  <button class="btn main" id="bConfirmar"></button>
+  <button class="btn" id="bSetupVolver">Volver</button>
+</div></section>
+ 
+<!-- INTRO DE NIVEL -->
+<section class="screen" id="intro"><div class="panel">
+  <p id="introPartida"></p>
+  <div class="big" id="introDeco"></div>
+  <h1 id="introTitulo"></h1>
+  <p id="introTexto"></p>
+  <button class="btn main" id="bCorrer">¡A correr!</button>
+  <button class="btn" id="bCambiar">Cambiar personaje</button>
+  <button class="btn" id="bIntroMenu">Menú principal</button>
+</div></section>
+ 
+<!-- CARRERA -->
+<section class="screen" id="game">
+  <div class="hud"><span id="hudNivel"></span><span>Tiempo: <b id="time">0.0</b> s</span><span>Pulsaciones: <b id="clicks">0</b></span></div>
+  <div id="count"></div>
+  <div id="abajo">
+    <div class="lane"><div class="who corre" id="me"></div><div class="flag" id="meta1"></div></div>
+    <div class="lane"><div class="who corre" id="rival"></div><div class="flag" id="meta2"></div></div>
+    <button class="push" id="push">¡Corre!</button>
+  </div>
+</section>
+ 
+<!-- FIN DE CARRERA -->
+<section class="screen" id="end"><div class="panel">
+  <div class="big" id="result"></div>
+  <h1 id="title"></h1>
+  <p id="detail"></p>
+  <button class="btn main" id="bSiguiente"></button>
+  <button class="btn" id="bMenu">Menú principal</button>
+</div></section>
+ 
+<!-- DESPEDIDA -->
+<section class="screen" id="adios"><div class="panel">
+  <div class="big">👋</div>
+  <h1>¡Gracias por jugar!</h1>
+  <p>Ya puedes cerrar esta pestaña. Tus partidas quedan guardadas.</p>
+  <button class="btn main" id="bInicio">Volver al inicio</button>
+</div></section>
+ 
+<canvas id="fx"></canvas>
+<button id="mute" aria-label="Activar o quitar el sonido" title="Sonido (tecla M)">🔊</button>
+ 
+<script>
+// ================== DATOS ==================
+const SPRITES = ["personaje-a.png", "personaje-b.png", "personaje-c.png", "personaje-d.png", "personaje-e.png", "personaje-f.png", "personaje-g.png", "personaje-h.png", "personaje-i.png"];   // las 8 imágenes de los personajes (A a H)
+const PERSONAJES = [
+  {nombre:'Messi',    paso:2.6, enfr:0,   nota:'Equilibrado'},
+  {nombre:'Cristiano',  paso:2.3, enfr:0,   nota:'Manos rápidas'},
+  {nombre:'Olise',     paso:3.4, enfr:160, nota:'Pasos grandes'},
+  {nombre:'Bellingham',  paso:4.2, enfr:260, nota:'Paso largo, ritmo pausado'},
+  {nombre:'Lamine',    paso:2.8, enfr:0,   nota:'Constante'},
+  {nombre:'Doue',   paso:2.2, enfr:0,   nota:'Pasos cortos, más reto'},
+  {nombre:'Mbappe',     paso:3.0, enfr:110, nota:'Ágil'},
+  {nombre:'Vini jr',     paso:3.8, enfr:220, nota:'Pasos largos'},
+  {nombre:'K. Mainoo', paso:2.4, enfr:0, nota:'Ágil y veloz'}
+];
+const DIFICULTADES = [
+  {e:'🙂', nombre:'Fácil',   mult:0.6},
+  {e:'😎', nombre:'Normal',  mult:1.0},
+  {e:'😈', nombre:'Difícil', mult:1.6}
+];
+const ESCENARIOS = [
+  {nombre:'El potrero del barrio', texto:'Barro, charcos y los vecinos alentando. Llega al arco antes que el perro del vecino.',
+   sky:['#7f93a6','#cdd6de'], sun:'🌦️', clouds:['☁️','☁️','🌧️'], far:{c:'#587a46',amp:10,k:3,base:40},
+   near:['🏘️','🌳','🥅','🪨','🌳','🏠'], ground:['#7b5632','#6f4c2b'], charcos:true, lane:'rgba(50,28,10,.35)', meta:'🥅', rival:'🐕', rn:'el perro del vecino',
+   crowd:['🙋‍♂️','🙌','👏','🧒','🙋‍♀️','📣'], fx:'llovizna'},
+  {nombre:'La cancha de playa', texto:'Arena caliente y olas. Llega al arco antes que el cangrejo.',
+   sky:['#4db3f5','#d9f2ff'], sun:'☀️', clouds:['☁️','☁️'], far:{c:'#2d8fd6',amp:7,k:5,base:40},
+   near:['🌴','⚽','🏖️','🥅','🌴'], ground:['#ecc983','#e2bc72'], lane:'rgba(150,100,30,.3)', meta:'🥅', rival:'🦀', rn:'el cangrejo', crowd:['🙌','👏','🙋‍♀️','🙋‍♂️']},
+  {nombre:'El estadio de tarde', texto:'La hinchada canta. Llega al arco antes que el portero.',
+   sky:['#ff9a4d','#ffe0a8'], sun:'🌅', clouds:['☁️','☁️'], far:{c:'#5a5f7a',amp:6,k:9,base:30},
+   near:['🏟️','📣','🚩','⚽','📣'], ground:['#4fae52','#459f49'], lane:'rgba(0,0,0,.22)', meta:'🥅', rival:'🧤', rn:'el portero', crowd:['🙌','📣','👏','🙋‍♂️','🚩']},
+  {nombre:'Noche de reflectores', texto:'Luces encendidas y estadio lleno. Llega al arco antes que la mascota.',
+   sky:['#0b1030','#2a3f7a'], sun:'🌕', clouds:['✨','⭐','✨'], far:{c:'#1b2450',amp:6,k:9,base:30},
+   near:['💡','🏟️','📸','🚩','💡'], ground:['#2f8a47','#287c3f'], lane:'rgba(255,255,255,.12)', meta:'🥅', rival:'🦁', rn:'la mascota', crowd:['🙌','📸','👏','🙋‍♀️']},
+  {nombre:'Partido bajo la lluvia', texto:'Cancha mojada y resbalosa. Llega al arco antes que la tarjeta amarilla.',
+   sky:['#5d6f82','#aab8c6'], sun:'🌧️', clouds:['🌧️','☁️','🌧️'], far:{c:'#46604f',amp:14,k:3,base:38},
+   near:['☂️','🏟️','⚽','🥅','☂️'], ground:['#3f7d4a','#387243'], charcos:true, lane:'rgba(0,0,0,.28)', meta:'🥅', rival:'🟨', rn:'la tarjeta amarilla', crowd:['☂️','🙌','☂️','👏'], fx:'lluvia'},
+  {nombre:'La cancha nevada', texto:'Nieve hasta las rodillas. Llega al arco antes que el pingüino.',
+   sky:['#9bbfe6','#eef6ff'], sun:'🌤️', clouds:['☁️','☁️','☁️'], far:{c:'#ffffff',amp:30,k:3,base:30},
+   near:['⛄','🌲','🥅','⚽','🌲'], ground:['#eef5fb','#dde9f4'], lane:'rgba(80,120,170,.3)', meta:'🥅', rival:'🐧', rn:'el pingüino', crowd:['🙌','🧒','👏','🧣'], fx:'nieve'},
+  {nombre:'El clásico', texto:'El partido más caliente del año. Llega al arco antes que el toro.',
+   sky:['#4a0f1c','#ff8a4d'], sun:'🌇', clouds:['🎆','☁️','🎆'], far:{c:'#5a1a2a',amp:8,k:9,base:30},
+   near:['🚩','📣','🔥','🏟️','🚩'], ground:['#3f9a4a','#368c41'], lane:'rgba(0,0,0,.25)', meta:'🥅', rival:'🐂', rn:'el toro', crowd:['🙌','🔥','📣','🙋‍♂️','🚩']},
+  {nombre:'La gran final', texto:'Última carrera. Llega a la copa antes que el águila dorada.',
+   sky:['#1a1040','#ffd36b'], sun:'🌟', clouds:['🎆','✨','🎇','✨'], far:{c:'#3a2a6a',amp:8,k:11,base:30},
+   near:['🏆','🎆','🏟️','🥇','🎇'], ground:['#2f9a4e','#288d45'], lane:'rgba(255,255,255,.14)', meta:'🏆', rival:'🦅', rn:'el águila dorada', crowd:['🙌','🎉','📣','👏','🎆'], fx:'confeti'}
+];
+ 
+// ================== PARTIDAS (3 ranuras) ==================
+const CLAVE = 'carreraGol_v1';
+const leerSlots = () => { try { const s = JSON.parse(localStorage.getItem(CLAVE)); if (Array.isArray(s) && s.length === 3) return s; } catch(e){} return [null,null,null]; };
+const guardarSlots = s => { try { localStorage.setItem(CLAVE, JSON.stringify(s)); } catch(e){} };
+let slots = leerSlots();
+let slot = -1;                 // ranura en uso
+let datos = null;              // {nombre, personaje, dificultad, nivel, victorias}
+const guardar = () => { if (slot >= 0) { slots[slot] = datos; guardarSlots(slots); } };
+ 
+let pos=0, rival=0, clicks=0, t0=0, ultimo=0, corriendo=false, timer=null;
+let modoSlots='nueva', modoSetup='nueva', tmpPers=0, tmpDif=1, accionSiguiente=null, fondoActual=null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const escenario = () => ESCENARIOS[datos.nivel-1];
+ 
+function mostrar(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  if (['menu','slots','setup','adios'].includes(id)) montarFondo(ESCENARIOS[0]);
+  $('stage').classList.toggle('run', id !== 'game');   // el fondo solo se detiene en la pantalla de carrera
+}
+ 
+// ================== SONIDO (se genera con código, sin archivos) ==================
+let ac = null, master = null, bufRuido = null, capas = [], gHinchada = null, baseHinchada = 0.05, fxAmb = null;
+let silencio = false;
+try { silencio = localStorage.getItem('carreraGol_silencio') === '1'; } catch(e){}
+ 
+function audio(){
+  if (!ac) {
+    try {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      master = ac.createGain(); master.gain.value = silencio ? 0 : 0.8; master.connect(ac.destination);
+    } catch(e){ ac = null; }
+  }
+  if (ac && ac.state === 'suspended') ac.resume();
+  return ac;
+}
+function bufferRuido(){
+  if (!bufRuido) {
+    const n = ac.sampleRate*2; bufRuido = ac.createBuffer(1, n, ac.sampleRate);
+    const d = bufRuido.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random()*2 - 1;
+  }
+  return bufRuido;
+}
+function tono(f, dur, tipo, vol, ini, f2){            // un pitido con volumen que sube y baja
+  if (!audio() || silencio) return;
+  const t = ac.currentTime + (ini || 0), o = ac.createOscillator(), g = ac.createGain();
+  o.type = tipo || 'sine'; o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || .15, t + .01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + .02);
+}
+function rafaga(dur, vol, tipo, f1, f2, ini){          // una ráfaga de ruido (aplausos, viento, golpe)
+  if (!audio() || silencio) return;
+  const t = ac.currentTime + (ini || 0), s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = bufferRuido(); f.type = tipo; f.frequency.setValueAtTime(f1, t); f.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur*.15); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + dur + .05);
+}
+const sClick = () => tono(620, .07, 'triangle', .12, 0, 880);
+const sBip   = () => tono(440, .18, 'square', .09);
+function sPaso(){ tono(190 + Math.random()*60, .09, 'sine', .16, 0, 90); rafaga(.05, .05, 'highpass', 3000, 5000); }   // patada al balón
+function sPito(){                                       // silbato del árbitro
+  if (!audio() || silencio) return;
+  const t = ac.currentTime, o = ac.createOscillator(), l = ac.createOscillator(), lg = ac.createGain(), g = ac.createGain();
+  o.type = 'sine'; o.frequency.value = 2900; l.frequency.value = 34; lg.gain.value = 260; l.connect(lg); lg.connect(o.frequency);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(.18, t + .03); g.gain.setValueAtTime(.18, t + .45); g.gain.exponentialRampToValueAtTime(0.0001, t + .6);
+  o.connect(g); g.connect(master); o.start(t); l.start(t); o.stop(t + .65); l.stop(t + .65);
+}
+function sGana(){                                       // fanfarria y grito de gol
+  [523, 659, 784, 1047].forEach((f, i) => tono(f, .28, 'square', .08, i*.12)); tono(1047, .6, 'triangle', .1, .5);
+  rafaga(1.6, .22, 'bandpass', 500, 1800); rafaga(1.2, .18, 'bandpass', 900, 2400, .3);
+}
+function sPierde(){ [392, 349, 311, 262].forEach((f, i) => tono(f, .3, 'sawtooth', .07, i*.2)); }
+ 
+// Ambiente: murmullo de la hinchada + lluvia, viento, etc. según el mapa
+function capaRuido(tipo, freq, q, vol, lfoHz, lfoProf){
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = bufferRuido(); s.loop = true; f.type = tipo; f.frequency.value = freq; f.Q.value = q; g.gain.value = vol;
+  s.connect(f); f.connect(g); g.connect(master); s.start();
+  let lfo = null;
+  if (lfoHz) { lfo = ac.createOscillator(); lfo.frequency.value = lfoHz; const lg = ac.createGain(); lg.gain.value = lfoProf; lfo.connect(lg); lg.connect(g.gain); lfo.start(); }
+  return {g, parar(){ try { s.stop(); if (lfo) lfo.stop(); } catch(e){} }};
+}
+function ambiente(fx){
+  fxAmb = fx;
+  if (!ac) return;                                      // se activa con el primer toque del jugador
+  capas.forEach(c => c.parar()); capas = [];
+  baseHinchada = fx === 'confeti' ? .07 : .05;
+  const h = capaRuido('bandpass', 650, .6, baseHinchada, .25, .02); gHinchada = h.g; capas.push(h);
+  if (fx === 'lluvia')   capas.push(capaRuido('highpass', 2200, .5, .06));
+  if (fx === 'llovizna') capas.push(capaRuido('highpass', 2600, .5, .03));
+  if (fx === 'nieve')    capas.push(capaRuido('lowpass', 500, .7, .03, .12, .015));
+}
+function animoHinchada(alto){                           // la hinchada grita más mientras corres
+  if (gHinchada && ac) gHinchada.gain.setTargetAtTime(alto ? baseHinchada*2.4 : baseHinchada, ac.currentTime, .4);
+}
+function aplicarSonido(){
+  $('mute').textContent = silencio ? '🔇' : '🔊';
+  if (master) master.gain.setTargetAtTime(silencio ? 0 : .8, ac.currentTime, .05);
+}
+function alternarSonido(){
+  audio(); silencio = !silencio;
+  try { localStorage.setItem('carreraGol_silencio', silencio ? '1' : '0'); } catch(e){}
+  aplicarSonido(); if (!silencio) sClick();
+}
+ 
+// ================== PARTÍCULAS (lluvia, nieve, confeti) ==================
+const cv = $('fx'), ctx = cv.getContext('2d');
+const sinMovimiento = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const COLORES = ['#ff4d4d','#ffd23f','#4dd2ff','#7dff6a','#ff7ae0'];
+let W = 0, Hh = 0, parts = [], modoFx = null, tPrev = performance.now();
+function ajustarCanvas(){
+  const d = window.devicePixelRatio || 1; W = innerWidth; Hh = innerHeight;
+  cv.width = W*d; cv.height = Hh*d; ctx.setTransform(d,0,0,d,0,0);
+}
+function nuevaParticula(m, inicial){
+  const r = Math.random;
+  const p = {x:r()*W, y: inicial ? r()*Hh : -30, ph:r()*6.28};
+  if (m === 'lluvia')        { p.vy = 900+r()*500; p.vx = -160; p.len = 14+r()*12; p.a = .35+r()*.25; }
+  else if (m === 'llovizna') { p.vy = 520+r()*300; p.vx = -90;  p.len = 8+r()*6;   p.a = .22+r()*.15; }
+  else if (m === 'nieve')    { p.vy = 45+r()*75;   p.r = 1.6+r()*3;  p.a = .6+r()*.4; }
+  else                       { p.vy = 130+r()*130; p.s = 5+r()*5; p.c = COLORES[Math.floor(r()*COLORES.length)]; p.rot = r()*6.28; p.spin = (r()-.5)*8; }
+  return p;
+}
+function crearFx(m){
+  modoFx = m; parts = [];
+  if (!m || sinMovimiento) return;
+  if (!W) ajustarCanvas();
+  const area = W*Hh;
+  const n = {lluvia:Math.min(260,area/6000), llovizna:Math.min(150,area/12000), nieve:Math.min(160,area/13000), confeti:Math.min(110,area/20000)}[m];
+  for (let i = 0; i < n; i++) parts.push(nuevaParticula(m, true));
+}
+function loopFx(t){
+  const dt = Math.min((t - tPrev)/1000, .05); tPrev = t;
+  ctx.clearRect(0,0,W,Hh);
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i]; p.y += p.vy*dt; p.ph += dt*2;
+    if (modoFx === 'lluvia' || modoFx === 'llovizna') {
+      p.x += p.vx*dt;
+      ctx.strokeStyle = `rgba(190,215,240,${p.a})`; ctx.lineWidth = modoFx === 'lluvia' ? 1.4 : 1;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + p.vx*.018*p.len/10, p.y - p.len); ctx.stroke();
+    } else if (modoFx === 'nieve') {
+      p.x += Math.sin(p.ph)*22*dt;
+      ctx.fillStyle = `rgba(255,255,255,${p.a})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
+    } else {
+      p.x += Math.sin(p.ph)*40*dt; p.rot += p.spin*dt;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c; ctx.fillRect(-p.s/2, -p.s/4, p.s, p.s/2); ctx.restore();
+    }
+    if (p.y > Hh + 30 || p.x < -40) parts[i] = nuevaParticula(modoFx, false);
+  }
+  requestAnimationFrame(loopFx);
+}
+addEventListener('resize', () => { ajustarCanvas(); crearFx(modoFx); });
+ajustarCanvas(); requestAnimationFrame(loopFx);
+ 
+// ================== FONDO CON PARALLAX ==================
+function franja(items, size, gap, seg, margenMax, fan){
+  const lista=[]; while(lista.length < (fan ? 40 : 12)) lista.push(...items);
+  const mitad = lista.map(e => {
+    const extra = fan
+      ? ` class="fan" style="margin:0 ${gap} 0 0;animation-duration:${(0.45+Math.random()*0.5).toFixed(2)}s;animation-delay:-${(Math.random()*0.9).toFixed(2)}s"`
+      : ` style="margin:${Math.round(Math.random()*margenMax)}px ${gap} 0 0"`;
+    return `<span${extra}>${e}</span>`;
+  }).join('');
+  return `<div class="strip" style="font-size:${size};animation-duration:${seg}s"><div class="half">${mitad}</div><div class="half">${mitad}</div></div>`;
+}
+function ondas({c,amp,k,base}){
+  let pts=''; for(let x=0;x<=400;x+=10) pts+=`${x},${base+amp*Math.sin(2*Math.PI*k*x/400)} `;
+  const svg=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'><polygon fill='${c}' points='${pts}400,100 0,100'/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+function montarFondo(e){
+  if (fondoActual === e) return; fondoActual = e;
+  $('sky').style.background = `linear-gradient(${e.sky[0]},${e.sky[1]})`;
+  $('sun').textContent = e.sun;
+  $('bClouds').style.cssText = 'top:5vh;height:26vh';
+  $('bClouds').innerHTML = franja(e.clouds, 'clamp(32px,7vh,64px)', '14vw', 60, 60);
+  $('hills').style.backgroundImage = ondas(e.far);
+  $('crowd').innerHTML = franja(e.crowd, 'clamp(30px,7vh,58px)', '.8vw', 45, 0, true);
+  $('bNear').style.cssText = 'bottom:35vh;height:22vh;align-items:flex-end';
+  $('bNear').innerHTML = franja(e.near, 'clamp(48px,11vh,100px)', '7vw', 9, 0);
+  const charcos = e.charcos ? [
+    'radial-gradient(ellipse 80px 12px at 20% 36%,rgba(185,215,235,.6),transparent 72%) 0 0/320px 100% repeat-x',
+    'radial-gradient(ellipse 120px 16px at 70% 64%,rgba(185,215,235,.55),transparent 72%) 0 0/320px 100% repeat-x'] : [];
+  $('ground').style.background = [...charcos, `linear-gradient(90deg,${e.ground[0]} 50%,${e.ground[1]} 50%) 0 0/320px 100% repeat-x`].join(',');
+  crearFx(e.fx || null); ambiente(e.fx || null);
+  document.querySelectorAll('.lane').forEach(l => l.style.background = e.lane);
+}
+ 
+// ================== MENÚ ==================
+function actualizarMenu(){
+  slots = leerSlots();
+  const usadas = slots.filter(Boolean).length;
+  $('bCargar').hidden = usadas === 0;
+  $('info').textContent = usadas ? `${usadas} de 3 partidas guardadas` : 'Gana ocho carreras en ocho estadios y canchas distintos.';
+  mostrar('menu');
+}
+$('bNueva').onclick  = () => abrirSlots('nueva');
+$('bCargar').onclick = () => abrirSlots('cargar');
+$('bSalir').onclick  = () => { try{window.close();}catch(e){} mostrar('adios'); };
+$('bInicio').onclick = actualizarMenu;
+$('bMenu').onclick = $('bIntroMenu').onclick = actualizarMenu;
+ 
+// ================== RANURAS ==================
+function abrirSlots(modo){
+  modoSlots = modo; slots = leerSlots();
+  $('slotsTitulo').textContent = modo === 'nueva' ? 'Nueva partida' : 'Cargar partida';
+  $('slotsTexto').textContent  = modo === 'nueva' ? 'Elige una ranura para guardar tu progreso.' : 'Elige la partida que quieres continuar.';
+  pintarSlots(); mostrar('slots');
+}
+function pintarSlots(){
+  const cont = $('slotLista'); cont.innerHTML = '';
+  slots.forEach((s, i) => {
+    const fila = document.createElement('div'); fila.className = 'fila';
+    const b = document.createElement('button'); b.className = 'slot';
+    b.innerHTML = s
+      ? `<img src="${SPRITES[s.personaje]}" alt=""><span><b>${esc(s.nombre)}</b><small>${PERSONAJES[s.personaje].nombre} · ${DIFICULTADES[s.dificultad].nombre} · Nivel ${s.nivel}/${ESCENARIOS.length} · ${s.victorias} victorias</small></span>`
+      : `<span class="vacia">＋</span><span><b>Ranura ${i+1}</b><small>Vacía</small></span>`;
+    b.disabled = modoSlots === 'cargar' && !s;
+    b.onclick = () => elegirSlot(i);
+    fila.appendChild(b);
+    if (s) {
+      const d = document.createElement('button'); d.className = 'del'; d.textContent = '🗑';
+      d.setAttribute('aria-label', 'Borrar partida');
+      d.onclick = () => { if (confirm(`¿Borrar la partida "${s.nombre}"?`)) { slots[i] = null; guardarSlots(slots); pintarSlots(); } };
+      fila.appendChild(d);
+    }
+    cont.appendChild(fila);
+  });
+}
+function elegirSlot(i){
+  if (modoSlots === 'cargar') { slot = i; datos = slots[i]; mostrarIntro(); return; }
+  if (slots[i] && !confirm(`La ranura ${i+1} ya tiene "${slots[i].nombre}". ¿Reemplazarla?`)) return;
+  slot = i; abrirSetup('nueva', {nombre:`Partida ${i+1}`, personaje:0, dificultad:1});
+}
+$('bSlotsVolver').onclick = actualizarMenu;
+ 
+// ================== NOMBRE, PERSONAJE, DIFICULTAD ==================
+PERSONAJES.forEach((p, i) => {
+  const b = document.createElement('button'); b.className = 'opt';
+  b.innerHTML = `<img src="${SPRITES[i]}" alt=""><b>${p.nombre}</b><small>${p.nota}</small>`;
+  b.onclick = () => { tmpPers = i; pintarSetup(); };
+  $('chars').appendChild(b);
+});
+DIFICULTADES.forEach((d, i) => {
+  const b = document.createElement('button'); b.className = 'opt';
+  b.innerHTML = `<span class="e">${d.e}</span><b>${d.nombre}</b>`;
+  b.onclick = () => { tmpDif = i; pintarSetup(); };
+  $('difs').appendChild(b);
+});
+function pintarSetup(){
+  [...$('chars').children].forEach((b,i) => b.setAttribute('aria-pressed', i === tmpPers));
+  [...$('difs').children].forEach((b,i) => b.setAttribute('aria-pressed', i === tmpDif));
+}
+function abrirSetup(modo, d){
+  modoSetup = modo; tmpPers = d.personaje; tmpDif = d.dificultad; $('nombre').value = d.nombre;
+  $('bConfirmar').textContent = modo === 'nueva' ? 'Empezar' : 'Guardar cambios';
+  pintarSetup(); mostrar('setup');
+}
+$('bConfirmar').onclick = () => {
+  const nombre = $('nombre').value.trim() || `Partida ${slot+1}`;
+  if (modoSetup === 'nueva') datos = {nombre, personaje:tmpPers, dificultad:tmpDif, nivel:1, victorias:0};
+  else { datos.nombre = nombre; datos.personaje = tmpPers; datos.dificultad = tmpDif; }
+  guardar(); mostrarIntro();
+};
+$('bSetupVolver').onclick = () => modoSetup === 'nueva' ? abrirSlots('nueva') : mostrarIntro();
+ 
+// ================== INTRO DE NIVEL ==================
+function mostrarIntro(){
+  const e = escenario(); montarFondo(e);
+  $('introPartida').textContent = `${datos.nombre} · ${PERSONAJES[datos.personaje].nombre} · ${DIFICULTADES[datos.dificultad].nombre}`;
+  $('introDeco').textContent = e.near.slice(0,3).join(' ');
+  $('introTitulo').textContent = `Nivel ${datos.nivel}: ${e.nombre}`;
+  $('introTexto').textContent = e.texto;
+  mostrar('intro');
+}
+$('bCorrer').onclick = empezar;
+$('bCambiar').onclick = () => abrirSetup('cambiar', datos);
+ 
+// ================== CARRERA ==================
+const velocidadRival = () => (0.45 + datos.nivel*0.14) * DIFICULTADES[datos.dificultad].mult;
+const colocar = (el, pct) => el.style.left = Math.min(pct,100)*0.9 + '%';
+function dibujar(){ colocar($('me'),pos); colocar($('rival'),rival); $('clicks').textContent = clicks; }
+ 
+function empezar(){
+  const e = escenario(); montarFondo(e);
+  pos = rival = clicks = ultimo = 0; corriendo = false; clearInterval(timer);
+  $('me').innerHTML = `<img src="${SPRITES[datos.personaje]}" alt="${PERSONAJES[datos.personaje].nombre}">`;
+  $('rival').innerHTML = `<span class="em">${e.rival}</span>`;
+  $('meta1').textContent = $('meta2').textContent = e.meta;
+  $('hudNivel').textContent = `Nivel ${datos.nivel}/${ESCENARIOS.length} · ${e.nombre} · ${DIFICULTADES[datos.dificultad].nombre}`;
+  $('time').textContent = '0.0'; dibujar(); mostrar('game');
+  let n = 3; $('count').textContent = n; sBip();
+  const cuenta = setInterval(() => {
+    n--;
+    if (n > 0) { $('count').textContent = n; sBip(); return; }
+    clearInterval(cuenta); sPito(); animoHinchada(true);
+    $('count').textContent = '¡Ya!'; setTimeout(() => $('count').textContent = '', 500);
+    corriendo = true; t0 = performance.now();
+    $('stage').classList.add('run');                     // el fondo empieza a moverse
+    timer = setInterval(tick, 100);
+  }, 800);
+}
+function tick(){
+  rival += velocidadRival() * (0.7 + Math.random()*0.6);
+  $('time').textContent = ((performance.now()-t0)/1000).toFixed(1);
+  dibujar(); revisar();
+}
+function pulsar(){
+  if (!corriendo) return;
+  const p = PERSONAJES[datos.personaje], ahora = performance.now();
+  if (ahora - ultimo < p.enfr) return;                    // algunos personajes tienen ritmo más pausado
+  ultimo = ahora; clicks++; pos += p.paso; sPaso(); dibujar(); revisar();
+}
+function revisar(){
+  if (pos < 100 && rival < 100) return;
+  corriendo = false; clearInterval(timer); $('stage').classList.remove('run'); animoHinchada(false);
+  const gane = pos >= 100 && pos >= rival, e = escenario();
+  const stats = `${clicks} pulsaciones en ${((performance.now()-t0)/1000).toFixed(1)} s.`;
+  if (!gane) {
+    $('result').textContent = e.rival; $('title').textContent = `Ganó ${e.rn}`;
+    $('detail').textContent = `${stats} Inténtalo de nuevo.`;
+    $('bSiguiente').textContent = 'Reintentar'; accionSiguiente = empezar; sPierde();
+  } else if (datos.nivel >= ESCENARIOS.length) {
+    datos.victorias++; datos.nivel = 1; guardar();
+    $('result').textContent = '🏅'; $('title').textContent = '¡Completaste el juego!';
+    $('detail').textContent = `${stats} Superaste los ${ESCENARIOS.length} lugares.`;
+    $('bSiguiente').textContent = 'Jugar desde el nivel 1'; accionSiguiente = mostrarIntro; sGana();
+  } else {
+    datos.victorias++; datos.nivel++; guardar();
+    $('result').textContent = '🏆'; $('title').textContent = '¡Ganaste! (partida guardada)';
+    $('detail').textContent = `${stats} Siguiente destino: ${escenario().nombre}.`;
+    $('bSiguiente').textContent = 'Siguiente nivel'; accionSiguiente = mostrarIntro; sGana();
+  }
+  mostrar('end');
+}
+$('bSiguiente').onclick = () => accionSiguiente && accionSiguiente();
+$('push').addEventListener('pointerdown', pulsar);
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && $('game').classList.contains('on')) { e.preventDefault(); pulsar(); }
+});
+ 
+// ================== SONIDO: activación y botón de silencio ==================
+document.addEventListener('click', e => { if (e.target.closest('.btn,.opt,.slot,.del')) sClick(); });
+const primerToque = () => { audio(); ambiente(fxAmb); };   // los navegadores solo dejan sonar tras un toque
+addEventListener('pointerdown', primerToque, {once:true});
+addEventListener('keydown', primerToque, {once:true});
+$('mute').onclick = alternarSonido;
+document.addEventListener('keydown', e => { if ((e.key === 'm' || e.key === 'M') && e.target.tagName !== 'INPUT') alternarSonido(); });
+document.addEventListener('visibilitychange', () => { if (!ac) return; if (document.hidden) ac.suspend(); else ac.resume(); });
+aplicarSonido();
+ 
+montarFondo(ESCENARIOS[0]);
+actualizarMenu(); 
+</script>
+</body>
+</html>
